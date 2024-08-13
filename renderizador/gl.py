@@ -150,17 +150,48 @@ class GL:
         # Exemplo:
         # gpu.GPU.draw_pixel([6, 8], gpu.GPU.RGB8, [255, 255, 0])  # altera pixel (u, v, tipo, r, g, b)
 
-        triangles = []
+        for i in range(0, len(vertices), 6):
+            v0 = vertices[i:i+2]    # [x1, y1]
+            v1 = vertices[i+2:i+4]  # [x2, y2]
+            v2 = vertices[i+4:i+6]  # [x3, y3]
 
-        while vertices:
-            triangles.append([vertices[0:2], vertices[2:4], vertices[4:6]])
-            del vertices[0:6]
+            # Desenhar as bordas do triângulo
+            GL.polyline2D(v0 + v1, colors)
+            GL.polyline2D(v1 + v2, colors)
+            GL.polyline2D(v2 + v0, colors)
 
-        while len(triangles) != 0:
-            p0, p1, p2 = triangles.pop(0)
-            GL.polyline2D([p0,p1], colors)
-            GL.polyline2D([p1,p2], colors)
-            GL.polyline2D([p2,p0], colors)
+            # Encontrar a bounding box do triângulo
+            min_x = int(min(v0[0], v1[0], v2[0]))
+            max_x = int(max(v0[0], v1[0], v2[0]))
+            min_y = int(min(v0[1], v1[1], v2[1]))
+            max_y = int(max(v0[1], v1[1], v2[1]))
+
+            # Função para calcular a interseção de uma linha horizontal com uma aresta do triângulo
+            def edge_intersect_y(y, p0, p1):
+                if p0[1] == p1[1]:  # A linha é horizontal, sem interseção
+                    return None
+                if p0[1] > p1[1]:
+                    p0, p1 = p1, p0
+                if y < p0[1] or y > p1[1]:
+                    return None
+                t = (y - p0[1]) / (p1[1] - p0[1])
+                return p0[0] + t * (p1[0] - p0[0])
+
+            # Preenchendo o triângulo usando o método de scanline
+            for y in range(min_y, max_y + 1):
+                intersections = []
+                for p0, p1 in [(v0, v1), (v1, v2), (v2, v0)]:
+                    x_intersect = edge_intersect_y(y, p0, p1)
+                    if x_intersect is not None:
+                        intersections.append(x_intersect)
+                
+                if len(intersections) >= 2:
+                    intersections.sort()
+                    x_start = int(intersections[0])
+                    x_end = int(intersections[-1])
+                    for x in range(x_start, x_end + 1):
+                        GL.polypoint2D([x, y], colors)
+            
 
     @staticmethod
     def triangleSet(point, colors):
