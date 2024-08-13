@@ -44,14 +44,20 @@ class GL:
         # você pode assumir inicialmente o desenho dos pontos com a cor emissiva (emissiveColor).
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("Polypoint2D : pontos = {0}".format(point)) # imprime no terminal pontos
-        print("Polypoint2D : colors = {0}".format(colors)) # imprime no terminal as cores
+        # print("Polypoint2D : pontos = {0}".format(point)) # imprime no terminal pontos
+        # print("Polypoint2D : colors = {0}".format(colors)) # imprime no terminal as cores
 
         # Exemplo:
-        pos_x = GL.width//2
-        pos_y = GL.height//2
-        gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [255, 0, 0])  # altera pixel (u, v, tipo, r, g, b)
+        # pos_x = GL.width//2
+        # pos_y = GL.height//2
+        # gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [255, 0, 0])  # altera pixel (u, v, tipo, r, g, b)
         # cuidado com as cores, o X3D especifica de (0,1) e o Framebuffer de (0,255)
+
+        while point:
+            pos_x = int(point.pop(0))
+            pos_y = int(point.pop(0))
+            color = {k: v for k, v in colors.items()}
+            gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [int(c*255) for c in color['emissiveColor']])
         
     @staticmethod
     def polyline2D(lineSegments, colors):
@@ -70,10 +76,46 @@ class GL:
         print("Polyline2D : colors = {0}".format(colors)) # imprime no terminal as cores
         
         # Exemplo:
-        pos_x = GL.width//2
-        pos_y = GL.height//2
-        gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [255, 0, 255])  # altera pixel (u, v, tipo, r, g, b)
+        # pos_x = GL.width//2
+        # pos_y = GL.height//2
+        # gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [255, 0, 255])  # altera pixel (u, v, tipo, r, g, b)
         # cuidado com as cores, o X3D especifica de (0,1) e o Framebuffer de (0,255)
+
+        points = [[x,y] for x,y in zip(lineSegments[::2], lineSegments[1::2])]
+        while points:
+            start = points.pop(0)
+            end = points.pop(0)
+
+            # u = x e v = y
+            if start[0] == end[0]:
+                v = round(start[1])
+                u = round(start[0])
+                for v in range(v, round(end[1]), 1):
+                    GL.polypoint2D([u, v], colors)
+
+            else:
+
+                if start[0] > end[0]:
+                    start, end = end, start
+
+                dx = end[0] - start[0]
+                dy = end[1] - start[1]
+
+                print(f'\n\n{dy/dx}\n\n')
+
+                if dy/dx <= 1 or dy/dx >= -1:
+                    s = dy/dx
+                    v = start[1]
+                    for u in range(round(start[0]), round(end[0]), 1):
+                        GL.polypoint2D([u, round(v)], colors)
+                        v += s
+                # else if dy/dx <= 1 or dy/dx >= -1::
+                #     s = dx/dy
+                #     u = start[0]
+                #     for v in range(round(start[1]), round(end[1]), 1):
+                #         GL.polypoint2D([round(u), v], colors)
+                #         u += s
+                   
 
     @staticmethod
     def circle2D(radius, colors):
