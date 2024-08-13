@@ -54,10 +54,10 @@ class GL:
         # cuidado com as cores, o X3D especifica de (0,1) e o Framebuffer de (0,255)
 
         while point:
-            pos_x = int(point.pop(0))
-            pos_y = int(point.pop(0))
+            pos_x = point.pop(0)
+            pos_y = point.pop(0)
             color = {k: v for k, v in colors.items()}
-            gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [int(c*255) for c in color['emissiveColor']])
+            gpu.GPU.draw_pixel([int(pos_x), int(pos_y)], gpu.GPU.RGB8, [int(c*255) for c in color['emissiveColor']])
         
     @staticmethod
     def polyline2D(lineSegments, colors):
@@ -72,8 +72,8 @@ class GL:
         # O parâmetro colors é um dicionário com os tipos cores possíveis, para o Polyline2D
         # você pode assumir inicialmente o desenho das linhas com a cor emissiva (emissiveColor).
 
-        print("Polyline2D : lineSegments = {0}".format(lineSegments)) # imprime no terminal
-        print("Polyline2D : colors = {0}".format(colors)) # imprime no terminal as cores
+        # print("Polyline2D : lineSegments = {0}".format(lineSegments)) # imprime no terminal
+        # print("Polyline2D : colors = {0}".format(colors)) # imprime no terminal as cores
         
         # Exemplo:
         # pos_x = GL.width//2
@@ -95,26 +95,25 @@ class GL:
 
             else:
 
-                if start[0] > end[0]:
-                    start, end = end, start
-
                 dx = end[0] - start[0]
                 dy = end[1] - start[1]
 
-                print(f'\n\n{dy/dx}\n\n')
-
-                if dy/dx <= 1 or dy/dx >= -1:
+                if abs(dx) > abs(dy):
+                    if start[0] > end[0]:
+                        start, end = end, start
                     s = dy/dx
                     v = start[1]
                     for u in range(round(start[0]), round(end[0]), 1):
-                        GL.polypoint2D([u, round(v)], colors)
+                        GL.polypoint2D([round(u), round(v)], colors)
                         v += s
-                # else if dy/dx <= 1 or dy/dx >= -1::
-                #     s = dx/dy
-                #     u = start[0]
-                #     for v in range(round(start[1]), round(end[1]), 1):
-                #         GL.polypoint2D([round(u), v], colors)
-                #         u += s
+                else:
+                    if start[1] > end[1]:
+                        start, end = end, start
+                    s = dx/dy
+                    u = start[0]
+                    for v in range(round(start[1]), round(end[1]), 1):
+                        GL.polypoint2D([round(u), round(v)], colors)
+                        u += s
                    
 
     @staticmethod
@@ -149,8 +148,19 @@ class GL:
         print("TriangleSet2D : colors = {0}".format(colors)) # imprime no terminal as cores
 
         # Exemplo:
-        gpu.GPU.draw_pixel([6, 8], gpu.GPU.RGB8, [255, 255, 0])  # altera pixel (u, v, tipo, r, g, b)
+        # gpu.GPU.draw_pixel([6, 8], gpu.GPU.RGB8, [255, 255, 0])  # altera pixel (u, v, tipo, r, g, b)
 
+        triangles = []
+
+        while vertices:
+            triangles.append([vertices[0:2], vertices[2:4], vertices[4:6]])
+            del vertices[0:6]
+
+        while len(triangles) != 0:
+            p0, p1, p2 = triangles.pop(0)
+            GL.polyline2D([p0,p1], colors)
+            GL.polyline2D([p1,p2], colors)
+            GL.polyline2D([p2,p0], colors)
 
     @staticmethod
     def triangleSet(point, colors):
