@@ -19,10 +19,16 @@ import numpy as np  # Biblioteca do Numpy
 class GL:
     """Classe que representa a biblioteca gráfica (Graphics Library)."""
 
-    width = 800   # largura da tela
-    height = 600  # altura da tela
-    near = 0.01   # plano de corte próximo
-    far = 1000    # plano de corte distante
+    largura = 800   # largura da tela
+    altura = 600  # altura da tela
+    proximo = 0.01   # plano de corte próximo
+    distante = 1000    # plano de corte distante
+
+    #Adicionado para melhor acesso pelas outras funções
+    perspective_matrix = np.identity(4)
+    view_matrix = np.identity(4)
+    transformation_matrix = np.identity(4)
+    transform_stack = [np.identity(4)]
 
     @staticmethod
     def setup(width, height, near=0.01, far=1000):
@@ -53,6 +59,8 @@ class GL:
         # gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [255, 0, 0])  # altera pixel (u, v, tipo, r, g, b)
         # cuidado com as cores, o X3D especifica de (0,1) e o Framebuffer de (0,255)
 
+        #DONE: Projeto 1.1
+
         while point:
             pos_x = point.pop(0)
             pos_y = point.pop(0)
@@ -80,6 +88,8 @@ class GL:
         # pos_y = GL.height//2
         # gpu.GPU.draw_pixel([pos_x, pos_y], gpu.GPU.RGB8, [255, 0, 255])  # altera pixel (u, v, tipo, r, g, b)
         # cuidado com as cores, o X3D especifica de (0,1) e o Framebuffer de (0,255)
+
+        #DONE: Projeto 1.1
 
         points = [[x,y] for x,y in zip(lineSegments[::2], lineSegments[1::2])]
         while points:
@@ -150,6 +160,8 @@ class GL:
         # Exemplo:
         # gpu.GPU.draw_pixel([6, 8], gpu.GPU.RGB8, [255, 255, 0])  # altera pixel (u, v, tipo, r, g, b)
 
+        #DONE: Projeto 1.1
+
         for i in range(0, len(vertices), 6):
             v0 = vertices[i:i+2]    # [x1, y1]
             v1 = vertices[i+2:i+4]  # [x2, y2]
@@ -210,11 +222,37 @@ class GL:
         # tipos de cores.
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("TriangleSet : pontos = {0}".format(point)) # imprime no terminal pontos
-        print("TriangleSet : colors = {0}".format(colors)) # imprime no terminal as cores
+        # print("TriangleSet : pontos = {0}".format(point)) # imprime no terminal pontos
+        # print("TriangleSet : colors = {0}".format(colors)) # imprime no terminal as cores
 
-        # Exemplo de desenho de um pixel branco na coordenada 10, 10
-        gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
+        # # Exemplo de desenho de um pixel branco na coordenada 10, 10
+        # gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
+
+        #DONE: Projeto 1.2
+
+        #Matriz de transformação da tela (3D -> 2D)
+        w, h = GL.width, GL.height
+        screen_matrix = np.array(
+            [[w / 2, 0, 0, w / 2], [0, -h / 2, 0, h / 2], [0, 0, 1, 0], [0, 0, 0, 1]]
+        )
+
+        #Lista paara a chamada de triangleset2d
+        triangleSet2D_input = []
+
+        while point:
+            p = [point.pop(0), point.pop(0), point.pop(0), 1.0] #Coordenadas Homogêneas
+
+            # Transformação da perspectiva 
+            p = GL.matriz_perspectiva @ GL.transform_stack[-1] @ p
+            p = p / p[-1]
+
+            p = screen_matrix @ p
+
+            triangleSet2D_input.append(p[0])
+            triangleSet2D_input.append(p[1])
+
+        GL.triangleSet2D(triangleSet2D_input, colors)
+
 
     @staticmethod
     def viewpoint(position, orientation, fieldOfView):
@@ -224,10 +262,83 @@ class GL:
         # perspectiva para poder aplicar nos pontos dos objetos geométricos.
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("Viewpoint : ", end='')
-        print("position = {0} ".format(position), end='')
-        print("orientation = {0} ".format(orientation), end='')
-        print("fieldOfView = {0} ".format(fieldOfView))
+        # print("Viewpoint : ", end='')
+        # print("position = {0} ".format(position), end='')
+        # print("orientation = {0} ".format(orientation), end='')
+        # print("fieldOfView = {0} ".format(fieldOfView))
+
+        #DONE: Projeto 1.2
+
+        # Extraindo componentes para melhor legibilidade
+        x, y, z = orientation[:3]
+        t = orientation[3]
+
+        # Pré-computando seno e cosseno para eficiência
+        cos_t = np.cos(t)
+        sin_t = np.sin(t)
+        one_minus_cos_t = 1 - cos_t
+
+        # Matriz de rotação para eixo arbitrário (vetor de orientação)
+        matriz_rotacao = np.array(
+            [
+            [
+                cos_t + x * x * one_minus_cos_t,
+                x * y * one_minus_cos_t - z * sin_t,
+                x * z * one_minus_cos_t + y * sin_t,
+                0,
+            ],
+            [
+                y * x * one_minus_cos_t + z * sin_t,
+                cos_t + y * y * one_minus_cos_t,
+                y * z * one_minus_cos_t - x * sin_t,
+                0,
+            ],
+            [
+                z * x * one_minus_cos_t - y * sin_t,
+                z * y * one_minus_cos_t + x * sin_t,
+                cos_t + z * z * one_minus_cos_t,
+                0,
+            ],
+            [0, 0, 0, 1],
+            ]
+        )
+
+        # Matriz de translação (posição da câmera)
+        matriz_translacao = np.array(
+            [
+            [1.0, 0.0, 0.0, -position[0]],
+            [0.0, 1.0, 0.0, -position[1]],
+            [0.0, 0.0, 1.0, -position[2]],
+            [0.0, 0.0, 0.0, 1.0],
+            ]
+        )
+
+        # Matriz LookAt: Rotacionar primeiro, depois transladar
+        matriz_look_at = matriz_rotacao @ matriz_translacao
+
+        # Matriz de projeção perspectiva
+        razao_aspecto = GL.largura / GL.altura
+        proximo = GL.proximo
+        distante = GL.distante
+        topo = proximo * np.tan(fieldOfView / 2)
+        direita = topo * razao_aspecto
+
+        matriz_perspectiva = np.array(
+            [
+            [proximo / direita, 0.0, 0.0, 0.0],
+            [0.0, proximo / topo, 0.0, 0.0],
+            [
+                0.0,
+                0.0,
+                -(distante + proximo) / (distante - proximo),
+                -2.0 * distante * proximo / (distante - proximo),
+            ],
+            [0.0, 0.0, -1.0, 0.0],
+            ]
+        )
+
+        # Matriz final que combina LookAt e Perspectiva
+        GL.matriz_perspectiva = matriz_perspectiva @ matriz_look_at
 
     @staticmethod
     def transform_in(translation, scale, rotation):
@@ -241,14 +352,72 @@ class GL:
         # modelos do mundo em alguma estrutura de pilha.
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("Transform : ", end='')
-        if translation:
-            print("translation = {0} ".format(translation), end='') # imprime no terminal
-        if scale:
-            print("scale = {0} ".format(scale), end='') # imprime no terminal
-        if rotation:
-            print("rotation = {0} ".format(rotation), end='') # imprime no terminal
-        print("")
+        # print("Transform : ", end='')
+        # if translation:
+        #     print("translation = {0} ".format(translation), end='') # imprime no terminal
+        # if scale:
+        #     print("scale = {0} ".format(scale), end='') # imprime no terminal
+        # if rotation:
+        #     print("rotation = {0} ".format(rotation), end='') # imprime no terminal
+        # print("")
+
+        #DONE: Projeto 1.2
+
+         # Matriz de escala
+        matriz_escala = np.array(
+            [
+                [scale[0], 0.0, 0.0, 0.0],
+                [0.0, scale[1], 0.0, 0.0],
+                [0.0, 0.0, scale[2], 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ]
+        )
+
+        # Matriz de translação
+        matriz_translacao = np.array(
+            [
+                [1.0, 0.0, 0.0, translation[0]],
+                [0.0, 1.0, 0.0, translation[1]],
+                [0.0, 0.0, 1.0, translation[2]],
+                [0.0, 0.0, 0.0, 1.0],
+            ]
+        )
+
+        # Matriz de rotação
+        x, y, z, t = rotation
+        cos_t = np.cos(t)
+        sin_t = np.sin(t)
+        um_menos_cos_t = 1 - cos_t
+
+        matriz_rotacao = np.array(
+            [
+                [
+                    cos_t + x * x * um_menos_cos_t,
+                    x * y * um_menos_cos_t - z * sin_t,
+                    x * z * um_menos_cos_t + y * sin_t,
+                    0,
+                ],
+                [
+                    y * x * um_menos_cos_t + z * sin_t,
+                    cos_t + y * y * um_menos_cos_t,
+                    y * z * um_menos_cos_t - x * sin_t,
+                    0,
+                ],
+                [
+                    z * x * um_menos_cos_t - y * sin_t,
+                    z * y * um_menos_cos_t + x * sin_t,
+                    cos_t + z * z * um_menos_cos_t,
+                    0,
+                ],
+                [0, 0, 0, 1],
+            ]
+        )
+
+        # Combinar transformações: Translação -> Rotação -> Escala
+        matriz_objeto_mundo = matriz_translacao @ matriz_rotacao @ matriz_escala
+
+        # Adicionar a transformação à pilha
+        GL.transform_stack.append(matriz_objeto_mundo)
 
     @staticmethod
     def transform_out():
