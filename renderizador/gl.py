@@ -82,7 +82,7 @@ class GL:
         # O parâmetro colors é um dicionário com os tipos cores possíveis, para o Polyline2D
         # você pode assumir inicialmente o desenho das linhas com a cor emissiva (emissiveColor).
 
-        # print("Polyline2D : lineSegments = {0}".format(lineSegments)) # imprime no terminal
+        print("Polyline2D : lineSegments = {0}".format(lineSegments)) # imprime no terminal
         # print("Polyline2D : colors = {0}".format(colors)) # imprime no terminal as cores
         
         # Exemplo:
@@ -159,7 +159,7 @@ class GL:
         # O parâmetro colors é um dicionário com os tipos cores possíveis, para o TriangleSet2D
         # você pode assumir inicialmente o desenho das linhas com a cor emissiva (emissiveColor).
         print("TriangleSet2D : vertices = {0}".format(vertices)) # imprime no terminal
-        print("TriangleSet2D : colors = {0}".format(colors)) # imprime no terminal as cores
+        # print("TriangleSet2D : colors = {0}".format(colors)) # imprime no terminal as cores
 
         # Exemplo:
         # gpu.GPU.draw_pixel([6, 8], gpu.GPU.RGB8, [255, 255, 0])  # altera pixel (u, v, tipo, r, g, b)
@@ -227,7 +227,7 @@ class GL:
         # tipos de cores.
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        # print("TriangleSet : pontos = {0}".format(point)) # imprime no terminal pontos
+        print("TriangleSet : pontos = {0}".format(point)) # imprime no terminal pontos
         # print("TriangleSet : colors = {0}".format(colors)) # imprime no terminal as cores
 
         # # Exemplo de desenho de um pixel branco na coordenada 10, 10
@@ -437,6 +437,11 @@ class GL:
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("Saindo de Transform")
 
+        #TODO: Projeto 1.3
+
+        # Remover a última matriz de transformação da pilha
+        GL.transform_stack.pop()
+
     @staticmethod
     def triangleStripSet(point, stripCount, colors):
         """Função usada para renderizar TriangleStripSet."""
@@ -460,7 +465,39 @@ class GL:
         print("TriangleStripSet : colors = {0}".format(colors)) # imprime no terminal as cores
 
         # Exemplo de desenho de um pixel branco na coordenada 10, 10
-        gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
+        # gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixe
+
+        # TODO: Projeto 1.3
+
+        triangles = []
+
+        for i in range(len(stripCount)):
+            strip = stripCount[i]
+            
+            ind = strip%3
+
+            v1x = 9*i+ind
+            v1y = 9*i+ind+1
+            v1z = 9*i+ind+2
+            v2x = 9*i+ind+3
+            v2y = 9*i+ind+4
+            v2z = 9*i+ind+5
+            v3x = 9*i+ind+6
+            v3y = 9*i+ind+7
+            v3z = 9*i+ind+8
+
+            triangles.append(point[v1x])
+            triangles.append(point[v1y])
+            triangles.append(point[v1z])
+            triangles.append(point[v2x])
+            triangles.append(point[v2y])
+            triangles.append(point[v2z])
+            triangles.append(point[v3x])
+            triangles.append(point[v3y])
+            triangles.append(point[v3z])
+        
+        print(f'\n{triangles}\n')
+        GL.triangleSet(triangles, colors)
 
     @staticmethod
     def indexedTriangleStripSet(point, index, colors):
@@ -480,10 +517,36 @@ class GL:
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("IndexedTriangleStripSet : pontos = {0}, index = {1}".format(point, index))
-        print("IndexedTriangleStripSet : colors = {0}".format(colors)) # imprime as cores
+        # print("IndexedTriangleStripSet : colors = {0}".format(colors)) # imprime as cores
 
         # Exemplo de desenho de um pixel branco na coordenada 10, 10
-        gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
+        # gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
+
+        #TODO: Projeto 1.3
+
+        triangles = []
+        new_points = []
+        for i in range(0, len(point), 3):
+            point_n = [point[i], point[i+1], point[i+2]]
+            new_points.append(point_n)        
+
+        i=0
+
+        while True:
+            if index[i] == -1:
+                if i == len(index)-1:
+                    break
+                i += 1
+            
+            v1 = index[i]
+
+            triangles.extend(new_points[v1])
+
+            i += 1
+
+        
+        GL.triangleSet(triangles, colors)
+        
 
     @staticmethod
     def indexedFaceSet(coord, coordIndex, colorPerVertex, color, colorIndex,
@@ -518,14 +581,16 @@ class GL:
             print("\tcores(r, g, b) = {0}, colorIndex = {1}".format(color, colorIndex))
         if texCoord and texCoordIndex:
             print("\tpontos(u, v) = {0}, texCoordIndex = {1}".format(texCoord, texCoordIndex))
-        if current_texture:
+        if current_texture: 
             image = gpu.GPU.load_texture(current_texture[0])
             print("\t Matriz com image = {0}".format(image))
             print("\t Dimensões da image = {0}".format(image.shape))
         print("IndexedFaceSet : colors = {0}".format(colors))  # imprime no terminal as cores
 
         # Exemplo de desenho de um pixel branco na coordenada 10, 10
-        gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
+        # gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
+
+        #TODO: Projeto 1.3
 
     @staticmethod
     def box(size, colors):
