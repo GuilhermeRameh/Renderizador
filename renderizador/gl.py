@@ -82,7 +82,7 @@ class GL:
         # O parâmetro colors é um dicionário com os tipos cores possíveis, para o Polyline2D
         # você pode assumir inicialmente o desenho das linhas com a cor emissiva (emissiveColor).
 
-        print("Polyline2D : lineSegments = {0}".format(lineSegments)) # imprime no terminal
+        # print("Polyline2D : lineSegments = {0}".format(lineSegments)) # imprime no terminal
         # print("Polyline2D : colors = {0}".format(colors)) # imprime no terminal as cores
         
         # Exemplo:
@@ -158,13 +158,15 @@ class GL:
         # quantidade de pontos é sempre multiplo de 3, ou seja, 6 valores ou 12 valores, etc.
         # O parâmetro colors é um dicionário com os tipos cores possíveis, para o TriangleSet2D
         # você pode assumir inicialmente o desenho das linhas com a cor emissiva (emissiveColor).
-        print("TriangleSet2D : vertices = {0}".format(vertices)) # imprime no terminal
+        # print("TriangleSet2D : vertices = {0}".format(vertices)) # imprime no terminal
         # print("TriangleSet2D : colors = {0}".format(colors)) # imprime no terminal as cores
 
         # Exemplo:
         # gpu.GPU.draw_pixel([6, 8], gpu.GPU.RGB8, [255, 255, 0])  # altera pixel (u, v, tipo, r, g, b)
 
         #DONE: Projeto 1.1
+
+        print(f'\n{len(vertices)}\n')
 
         for i in range(0, len(vertices), 6):
             v0 = vertices[i:i+2]    # [x1, y1]
@@ -235,6 +237,8 @@ class GL:
 
         #DONE: Projeto 1.2
 
+        print(f'\n{len(point)}\n')
+
         #Matriz de transformação da tela (3D -> 2D)
         w, h = GL.width, GL.height
         screen_matrix = np.array(
@@ -243,6 +247,7 @@ class GL:
 
         #Lista paara a chamada de triangleset2d
         triangleSet2D_input = []
+
 
         while point:
             p = [point.pop(0), point.pop(0), point.pop(0), 1.0] #Coordenadas Homogêneas
@@ -255,7 +260,7 @@ class GL:
 
             triangleSet2D_input.append(p[0])
             triangleSet2D_input.append(p[1])
-
+        
         GL.triangleSet2D(triangleSet2D_input, colors)
 
 
@@ -473,28 +478,26 @@ class GL:
 
         for i in range(len(stripCount)):
             strip = stripCount[i]
-            
-            ind = strip%3
 
-            v1x = 9*i+ind
-            v1y = 9*i+ind+1
-            v1z = 9*i+ind+2
-            v2x = 9*i+ind+3
-            v2y = 9*i+ind+4
-            v2z = 9*i+ind+5
-            v3x = 9*i+ind+6
-            v3y = 9*i+ind+7
-            v3z = 9*i+ind+8
+            for j in range(0, strip-2, 1):
+                if j%2 == 0:
+                    v1 = 9*i+j
+                    v2 = 9*i+j+3
+                    v3 = 9*i+j+6
+                else:
+                    v1 = 9*i+j+3
+                    v2 = 9*i+j
+                    v3 = 9*i+j+6
 
-            triangles.append(point[v1x])
-            triangles.append(point[v1y])
-            triangles.append(point[v1z])
-            triangles.append(point[v2x])
-            triangles.append(point[v2y])
-            triangles.append(point[v2z])
-            triangles.append(point[v3x])
-            triangles.append(point[v3y])
-            triangles.append(point[v3z])
+                triangles.append(point[v1])
+                triangles.append(point[v1+1])
+                triangles.append(point[v1+2])
+                triangles.append(point[v2])
+                triangles.append(point[v2+1])
+                triangles.append(point[v2+2])
+                triangles.append(point[v3])
+                triangles.append(point[v3+1])
+                triangles.append(point[v3+2])
         
         print(f'\n{triangles}\n')
         GL.triangleSet(triangles, colors)
@@ -537,13 +540,19 @@ class GL:
                 if i == len(index)-1:
                     break
                 i += 1
+                continue
             
+            j = (i+1)%len(index)
+            h = (i+2)%len(index)
             v1 = index[i]
+            v2 = index[j]
+            v3 = index[h]
 
             triangles.extend(new_points[v1])
+            triangles.extend(new_points[v2])
+            triangles.extend(new_points[v3])
 
             i += 1
-
         
         GL.triangleSet(triangles, colors)
         
@@ -591,6 +600,33 @@ class GL:
         # gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
 
         #TODO: Projeto 1.3
+
+        triangles = []
+        new_points = []
+        for i in range(0, len(coord), 3):
+            point_n = [coord[i], coord[i+1], coord[i+2]]
+            new_points.append(point_n)        
+
+        i=0
+
+        while True:
+            if coordIndex[i] == -1:
+                if i == len(coordIndex)-1:
+                    break
+                i += 1
+            
+            v1 = coordIndex[i]
+            v2 = coordIndex[i+1]
+            v3 = coordIndex[i+2]
+
+            triangles.extend(new_points[v1])
+            triangles.extend(new_points[v2])
+            triangles.extend(new_points[v3])
+
+            i += 3
+
+        GL.triangleSet(triangles, colors)
+        
 
     @staticmethod
     def box(size, colors):
