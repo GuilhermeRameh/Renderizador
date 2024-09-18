@@ -401,6 +401,8 @@ class GL:
         sin_t = np.sin(t)
         um_menos_cos_t = 1 - cos_t
 
+        # TODO: Revisar quaterenios
+
         matriz_rotacao = np.array(
             [
                 [
@@ -429,7 +431,8 @@ class GL:
         matriz_objeto_mundo = matriz_translacao @ matriz_rotacao @ matriz_escala
 
         # Adicionar a transformação à pilha
-        GL.transform_stack.append(matriz_objeto_mundo)
+        #TODO: Reempilhar com a multiplicação a nova
+        GL.transform_stack.append(GL.transform_stack[-1] @ matriz_objeto_mundo)
 
     @staticmethod
     def transform_out():
@@ -600,6 +603,8 @@ class GL:
         # gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
 
         #TODO: Projeto 1.3
+
+        #trava primeira coordenada e vai até o -1 (0,1,2; 0,2,3 .. .. .. -1)
 
         triangles = []
         new_points = []
