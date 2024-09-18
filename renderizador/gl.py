@@ -240,7 +240,7 @@ class GL:
         print(f'\n{len(point)}\n')
 
         #Matriz de transformação da tela (3D -> 2D)
-        w, h = GL.width, GL.height
+        w, h = GL.width-1, GL.height-1
         screen_matrix = np.array(
             [[w / 2, 0, 0, w / 2], [0, -h / 2, 0, h / 2], [0, 0, 1, 0], [0, 0, 0, 1]]
         )
@@ -403,27 +403,38 @@ class GL:
 
         # TODO: Revisar quaterenios
 
+        # Normalizar o eixo de rotação
+        axis = np.array([x, y, z])
+        axis = axis / np.linalg.norm(axis)
+
+        # Calcular os componentes do quaternio
+        qw = np.cos(t / 2)
+        qx = axis[0] * np.sin(t / 2)
+        qy = axis[1] * np.sin(t / 2)
+        qz = axis[2] * np.sin(t / 2)
+
+        # Matriz de rotação usando quaternio
         matriz_rotacao = np.array(
             [
-                [
-                    cos_t + x * x * um_menos_cos_t,
-                    x * y * um_menos_cos_t - z * sin_t,
-                    x * z * um_menos_cos_t + y * sin_t,
-                    0,
-                ],
-                [
-                    y * x * um_menos_cos_t + z * sin_t,
-                    cos_t + y * y * um_menos_cos_t,
-                    y * z * um_menos_cos_t - x * sin_t,
-                    0,
-                ],
-                [
-                    z * x * um_menos_cos_t - y * sin_t,
-                    z * y * um_menos_cos_t + x * sin_t,
-                    cos_t + z * z * um_menos_cos_t,
-                    0,
-                ],
-                [0, 0, 0, 1],
+            [
+                1 - 2 * (qy * qy + qz * qz),
+                2 * (qx * qy - qz * qw),
+                2 * (qx * qz + qy * qw),
+                0,
+            ],
+            [
+                2 * (qx * qy + qz * qw),
+                1 - 2 * (qx * qx + qz * qz),
+                2 * (qy * qz - qx * qw),
+                0,
+            ],
+            [
+                2 * (qx * qz - qy * qw),
+                2 * (qy * qz + qx * qw),
+                1 - 2 * (qx * qx + qy * qy),
+                0,
+            ],
+            [0, 0, 0, 1],
             ]
         )
 
@@ -431,7 +442,7 @@ class GL:
         matriz_objeto_mundo = matriz_translacao @ matriz_rotacao @ matriz_escala
 
         # Adicionar a transformação à pilha
-        #TODO: Reempilhar com a multiplicação a nova
+        #DONE: Reempilhar com a multiplicação a nova
         GL.transform_stack.append(GL.transform_stack[-1] @ matriz_objeto_mundo)
 
     @staticmethod
@@ -479,30 +490,23 @@ class GL:
 
         triangles = []
 
-        for i in range(len(stripCount)):
-            strip = stripCount[i]
-
-            for j in range(0, strip-2, 1):
-                if j%2 == 0:
-                    v1 = 9*i+j
-                    v2 = 9*i+j+3
-                    v3 = 9*i+j+6
+        index = 0
+        for strip in stripCount:
+            for i in range(strip - 2):
+                if i % 2 == 0:
+                    v1 = index + i
+                    v2 = index + i + 1
+                    v3 = index + i + 2
                 else:
-                    v1 = 9*i+j+3
-                    v2 = 9*i+j
-                    v3 = 9*i+j+6
+                    v1 = index + i + 1
+                    v2 = index + i
+                    v3 = index + i + 2
 
-                triangles.append(point[v1])
-                triangles.append(point[v1+1])
-                triangles.append(point[v1+2])
-                triangles.append(point[v2])
-                triangles.append(point[v2+1])
-                triangles.append(point[v2+2])
-                triangles.append(point[v3])
-                triangles.append(point[v3+1])
-                triangles.append(point[v3+2])
-        
-        print(f'\n{triangles}\n')
+                triangles.extend(point[v1 * 3:v1 * 3 + 3])
+                triangles.extend(point[v2 * 3:v2 * 3 + 3])
+                triangles.extend(point[v3 * 3:v3 * 3 + 3])
+            index += strip
+
         GL.triangleSet(triangles, colors)
 
     @staticmethod
@@ -531,32 +535,28 @@ class GL:
         #TODO: Projeto 1.3
 
         triangles = []
-        new_points = []
-        for i in range(0, len(point), 3):
-            point_n = [point[i], point[i+1], point[i+2]]
-            new_points.append(point_n)        
+        new_points = [point[i:i + 3] for i in range(0, len(point), 3)]
+        i = 0
 
-        i=0
-
-        while True:
+        while i < len(index) - 2:
             if index[i] == -1:
-                if i == len(index)-1:
-                    break
                 i += 1
                 continue
-            
-            j = (i+1)%len(index)
-            h = (i+2)%len(index)
+
+            if index[i + 1] == -1 or index[i + 2] == -1:
+                i += 1
+                continue
+
             v1 = index[i]
-            v2 = index[j]
-            v3 = index[h]
+            v2 = index[i + 1]
+            v3 = index[i + 2]
 
             triangles.extend(new_points[v1])
             triangles.extend(new_points[v2])
             triangles.extend(new_points[v3])
 
             i += 1
-        
+
         GL.triangleSet(triangles, colors)
         
 
@@ -614,14 +614,35 @@ class GL:
             new_points.append(point_n)        
 
         i=0
+        j=0
 
+        #NOTE: Só funciona pra letras
+        # while True:
+        #     if coordIndex[i] == -1: # pra funcionar pros leques, i+2
+        #         if i == len(coordIndex)-1: # i+2
+        #             break
+        #         i += 1
+        #         j = 1 
+            
+        #     v1 = coordIndex[i]
+        #     v2 = coordIndex[i+1]
+        #     v3 = coordIndex[i+2]
+
+        #     triangles.extend(new_points[v1])
+        #     triangles.extend(new_points[v2])
+        #     triangles.extend(new_points[v3])
+
+        #     i += 3
+
+        #NOTE: Esta não funciona pra letras, mas funciona pro resto
         while True:
-            if coordIndex[i] == -1:
-                if i == len(coordIndex)-1:
+            if coordIndex[i+2] == -1: # pra funcionar pros leques, i+2
+                if i+2 == len(coordIndex)-1: # i+2
                     break
                 i += 1
+                j = 1 
             
-            v1 = coordIndex[i]
+            v1 = coordIndex[j]
             v2 = coordIndex[i+1]
             v3 = coordIndex[i+2]
 
@@ -629,7 +650,7 @@ class GL:
             triangles.extend(new_points[v2])
             triangles.extend(new_points[v3])
 
-            i += 3
+            i += 1
 
         GL.triangleSet(triangles, colors)
         
