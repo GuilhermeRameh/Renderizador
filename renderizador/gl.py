@@ -229,15 +229,13 @@ class GL:
         # tipos de cores.
 
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
-        print("TriangleSet : pontos = {0}".format(point)) # imprime no terminal pontos
+        # print("TriangleSet : pontos = {0}".format(point)) # imprime no terminal pontos
         # print("TriangleSet : colors = {0}".format(colors)) # imprime no terminal as cores
 
         # # Exemplo de desenho de um pixel branco na coordenada 10, 10
         # gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
 
         #DONE: Projeto 1.2
-
-        print(f'\n{len(point)}\n')
 
         #Matriz de transformação da tela (3D -> 2D)
         w, h = GL.width-1, GL.height-1
@@ -250,7 +248,11 @@ class GL:
 
 
         while point:
-            p = [point.pop(0), point.pop(0), point.pop(0), 1.0] #Coordenadas Homogêneas
+
+            # Pontos triangulo para interpolação 
+            A, B, C = point.pop(0), point.pop(0), point.pop(0)
+            p = [A, B, C, 1.0] #Coordenadas Homogêneas
+
 
             # Transformação da perspectiva 
             p = GL.matriz_perspectiva @ GL.transform_stack[-1] @ p
@@ -261,7 +263,40 @@ class GL:
             triangleSet2D_input.append(p[0])
             triangleSet2D_input.append(p[1])
         
-        GL.triangleSet2D(triangleSet2D_input, colors)
+        #TODO: Implementar o preenchimento do triângulo para interpolação
+        # Verificar se cada ponto está dentro da bounding box do triângulo
+        min_x = int(min(triangleSet2D_input[::2]))
+        max_x = int(max(triangleSet2D_input[::2]))
+        min_y = int(min(triangleSet2D_input[1::2]))
+        max_y = int(max(triangleSet2D_input[1::2]))
+
+        # Função para calcular a interseção de uma linha horizontal com uma aresta do triângulo
+        def edge_intersect_y(y, p0, p1):
+            if p0[1] == p1[1]:  # A linha é horizontal, sem interseção
+                return None
+            if p0[1] > p1[1]:
+                p0, p1 = p1, p0
+            if y < p0[1] or y > p1[1]:
+                return None
+            t = (y - p0[1]) / (p1[1] - p0[1])
+            return p0[0] + t * (p1[0] - p0[0])
+
+        # Preenchendo o triângulo usando o método de scanline
+        for y in range(min_y, max_y + 1):
+            intersections = []
+            for i in range(0, len(triangleSet2D_input), 2):
+                p0 = triangleSet2D_input[i:i+2]
+                p1 = triangleSet2D_input[(i+2) % len(triangleSet2D_input):(i+4) % len(triangleSet2D_input)]
+                x_intersect = edge_intersect_y(y, p0, p1)
+                if x_intersect is not None:
+                    intersections.append(x_intersect)
+                
+                if len(intersections) >= 2:
+                    intersections.sort()
+                    x_start = int(intersections[0])
+                    x_end = int(intersections[-1])
+                    for x in range(x_start, x_end + 1):
+                        GL.polypoint2D([x, y], colors)
 
 
     @staticmethod
@@ -401,7 +436,7 @@ class GL:
         sin_t = np.sin(t)
         um_menos_cos_t = 1 - cos_t
 
-        # TODO: Revisar quaterenios
+        # DONE: Revisar quaterenios
 
         # Normalizar o eixo de rotação
         axis = np.array([x, y, z])
@@ -456,7 +491,7 @@ class GL:
         # O print abaixo é só para vocês verificarem o funcionamento, DEVE SER REMOVIDO.
         print("Saindo de Transform")
 
-        #TODO: Projeto 1.3
+        #DONE: Projeto 1.3
 
         # Remover a última matriz de transformação da pilha
         GL.transform_stack.pop()
@@ -486,7 +521,7 @@ class GL:
         # Exemplo de desenho de um pixel branco na coordenada 10, 10
         # gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixe
 
-        # TODO: Projeto 1.3
+        # DONE: Projeto 1.3
 
         triangles = []
 
@@ -532,7 +567,7 @@ class GL:
         # Exemplo de desenho de um pixel branco na coordenada 10, 10
         # gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
 
-        #TODO: Projeto 1.3
+        #DONE: Projeto 1.3
 
         triangles = []
         new_points = [point[i:i + 3] for i in range(0, len(point), 3)]
@@ -603,7 +638,8 @@ class GL:
         # Exemplo de desenho de um pixel branco na coordenada 10, 10
         # gpu.GPU.draw_pixel([10, 10], gpu.GPU.RGB8, [255, 255, 255])  # altera pixel
 
-        #TODO: Projeto 1.3
+        #DONE: Projeto 1.3
+        #TODO: Projeto 1.4 - implementar interpolação
 
         #trava primeira coordenada e vai até o -1 (0,1,2; 0,2,3 .. .. .. -1)
 
