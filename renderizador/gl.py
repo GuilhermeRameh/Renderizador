@@ -166,8 +166,6 @@ class GL:
 
         #DONE: Projeto 1.1
 
-        print(f'\n{len(vertices)}\n')
-
         for i in range(0, len(vertices), 6):
             v0 = vertices[i:i+2]    # [x1, y1]
             v1 = vertices[i+2:i+4]  # [x2, y2]
@@ -263,33 +261,38 @@ class GL:
             triangleSet2D_input.append(p[0])
             triangleSet2D_input.append(p[1])
         
-        #TODO: Implementar o preenchimento do triângulo para interpolação
-        # Verificar se cada ponto está dentro da bounding box do triângulo
-        min_x = int(min(triangleSet2D_input[::2]))
-        max_x = int(max(triangleSet2D_input[::2]))
-        min_y = int(min(triangleSet2D_input[1::2]))
-        max_y = int(max(triangleSet2D_input[1::2]))
+        for i in range(0, len(triangleSet2D_input), 6):
+            v0 = triangleSet2D_input[i:i+2]    # [x1, y1]
+            v1 = triangleSet2D_input[i+2:i+4]  # [x2, y2]
+            v2 = triangleSet2D_input[i+4:i+6]  # [x3, y3]
 
-        # Função para calcular a interseção de uma linha horizontal com uma aresta do triângulo
-        def edge_intersect_y(y, p0, p1):
-            if p0[1] == p1[1]:  # A linha é horizontal, sem interseção
-                return None
-            if p0[1] > p1[1]:
-                p0, p1 = p1, p0
-            if y < p0[1] or y > p1[1]:
-                return None
-            t = (y - p0[1]) / (p1[1] - p0[1])
-            return p0[0] + t * (p1[0] - p0[0])
+            # Desenhar as bordas do triângulo
+            GL.polyline2D(v0 + v1, colors)
+            GL.polyline2D(v1 + v2, colors)
+            GL.polyline2D(v2 + v0, colors)
 
-        # Preenchendo o triângulo usando o método de scanline
-        for y in range(min_y, max_y + 1):
-            intersections = []
-            for i in range(0, len(triangleSet2D_input), 2):
-                p0 = triangleSet2D_input[i:i+2]
-                p1 = triangleSet2D_input[(i+2) % len(triangleSet2D_input):(i+4) % len(triangleSet2D_input)]
-                x_intersect = edge_intersect_y(y, p0, p1)
-                if x_intersect is not None:
-                    intersections.append(x_intersect)
+            # Encontrar a bounding box do triângulo
+            min_y = int(min(v0[1], v1[1], v2[1]))
+            max_y = int(max(v0[1], v1[1], v2[1]))
+
+            # Função para calcular a interseção de uma linha horizontal com uma aresta do triângulo
+            def edge_intersect_y(y, p0, p1):
+                if p0[1] == p1[1]:  # A linha é horizontal, sem interseção
+                    return None
+                if p0[1] > p1[1]:
+                    p0, p1 = p1, p0
+                if y < p0[1] or y > p1[1]:
+                    return None
+                t = (y - p0[1]) / (p1[1] - p0[1])
+                return p0[0] + t * (p1[0] - p0[0])
+
+            # Preenchendo o triângulo usando o método de scanline
+            for y in range(min_y, max_y + 1):
+                intersections = []
+                for p0, p1 in [(v0, v1), (v1, v2), (v2, v0)]:
+                    x_intersect = edge_intersect_y(y, p0, p1)
+                    if x_intersect is not None:
+                        intersections.append(x_intersect)
                 
                 if len(intersections) >= 2:
                     intersections.sort()
