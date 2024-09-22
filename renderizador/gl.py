@@ -166,19 +166,22 @@ class GL:
 
         #DONE: Projeto 1.1
 
-        for i in range(0, len(vertices), 6):
-            v0 = vertices[i:i+2]    # [x1, y1]
-            v1 = vertices[i+2:i+4]  # [x2, y2]
-            v2 = vertices[i+4:i+6]  # [x3, y3]
+        # Supersampling factor
+        ss_factor = 2
 
-            # Desenhar as bordas do triângulo
-            GL.polyline2D(v0 + v1, colors)
-            GL.polyline2D(v1 + v2, colors)
-            GL.polyline2D(v2 + v0, colors)
+        # Supersampled width and height
+        ss_width = GL.width * ss_factor
+        ss_height = GL.height * ss_factor
+
+        # Supersampled framebuffer
+        ss_framebuffer = np.zeros((ss_height, ss_width, 3), dtype=np.float32)
+
+        for i in range(0, len(vertices), 6):
+            v0 = [coord * ss_factor for coord in vertices[i:i+2]]    # [x1, y1]
+            v1 = [coord * ss_factor for coord in vertices[i+2:i+4]]  # [x2, y2]
+            v2 = [coord * ss_factor for coord in vertices[i+4:i+6]]  # [x3, y3]
 
             # Encontrar a bounding box do triângulo
-            min_x = int(min(v0[0], v1[0], v2[0]))
-            max_x = int(max(v0[0], v1[0], v2[0]))
             min_y = int(min(v0[1], v1[1], v2[1]))
             max_y = int(max(v0[1], v1[1], v2[1]))
 
@@ -206,7 +209,18 @@ class GL:
                     x_start = int(intersections[0])
                     x_end = int(intersections[-1])
                     for x in range(x_start, x_end + 1):
-                        GL.polypoint2D([x, y], colors)
+                        if 0 <= x < ss_width and 0 <= y < ss_height:
+                            ss_framebuffer[y, x] = colors['emissiveColor']
+
+            for y in range(GL.height-1):
+                for x in range(GL.width-1):
+                    color_sum = np.zeros(3)
+                    for dy in range(ss_factor):
+                        for dx in range(ss_factor):
+                            if 0 <= y * ss_factor + dy < ss_height and 0 <= x * ss_factor + dx < ss_width:
+                                color_sum += ss_framebuffer[min(y * ss_factor + dy, ss_height - 1), min(x * ss_factor + dx, ss_width - 1)]
+                    avg_color = color_sum / (ss_factor * ss_factor)
+                    gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, (avg_color * 255).astype(int).tolist())
             
 
     @staticmethod
