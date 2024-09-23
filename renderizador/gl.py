@@ -29,6 +29,17 @@ class GL:
     view_matrix = np.identity(4)
     transformation_matrix = np.identity(4)
     transform_stack = [np.identity(4)]
+    z_buffer = np.full((largura, altura), np.inf)
+
+   
+    @staticmethod
+    def draw_pixel(coord, depth, color):
+        x, y = coord
+        if 0 <= x < GL.width and 0 <= y < GL.height:
+            if depth < GL.z_buffer[x, y]:
+                GL.z_buffer[x, y] = depth
+                gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, color)
+
 
     @staticmethod
     def setup(width, height, near=0.01, far=1000):
@@ -339,7 +350,7 @@ class GL:
                             color = colors['emissiveColor']
 
                         # Desenhar o pixel no framebuffer com a cor interpolada
-                        gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, [int(c * 255) for c in color])
+                        GL.draw_pixel([x, y], z, [int(c * 255) for c in color])
 
 
     @staticmethod
