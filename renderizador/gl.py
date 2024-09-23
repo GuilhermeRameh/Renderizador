@@ -250,6 +250,7 @@ class GL:
         #DONE: Projeto 1.2
 
         # Matriz de transformação da tela (3D -> 2D)
+        # Transformação da tela (3D -> 2D)
         w, h = GL.width - 1, GL.height - 1
         screen_matrix = np.array(
             [[w / 2, 0, 0, w / 2], [0, -h / 2, 0, h / 2], [0, 0, 1, 0], [0, 0, 0, 1]]
@@ -260,74 +261,85 @@ class GL:
             perVertex = True
 
         # Lista para a chamada de triangleset2d
-        triangleSet2D_input = []
+        triangleSet3D_input = []
 
         while point:
-            # Pontos triangulo para interpolação
-            A, B, C = point.pop(0), point.pop(0), point.pop(0)
-            p = [A, B, C, 1.0]  # Coordenadas Homogêneas
+            # Pontos do triângulo para interpolação
+            X, Y, Z = point.pop(0), point.pop(0), point.pop(0)
+            p = np.array([X, Y, Z, 1.0])  # Coordenadas homogêneas
 
-            # Transformação da perspectiva
-            p = GL.matriz_perspectiva @ GL.transform_stack[-1] @ p
-            p = p / p[-1]
-
-            p = screen_matrix @ p
-
-            triangleSet2D_input.append(p[0])
-            triangleSet2D_input.append(p[1])
-            if perVertex:
-                triangleSet2D_input.append(p[2])            
+            # Transformação do ponto pela matriz de transformação e perspectiva
+            p_transformed = GL.matriz_perspectiva @ GL.transform_stack[-1] @ p
+            
+            # Não fazemos a divisão por w ainda! Mantemos as coordenadas 3D.
+            triangleSet3D_input.extend([p_transformed[0]])
+            triangleSet3D_input.extend([p_transformed[1]])
+            triangleSet3D_input.extend([p_transformed[2]])
+            triangleSet3D_input.extend([p_transformed[3]])
 
         def barycentric_coords(x, y, v0, v1, v2):
+            # Função auxiliar para calcular coordenadas baricêntricas
             denom = (v1[1] - v2[1]) * (v0[0] - v2[0]) + (v2[0] - v1[0]) * (v0[1] - v2[1])
             w1 = ((v1[1] - v2[1]) * (x - v2[0]) + (v2[0] - v1[0]) * (y - v2[1])) / denom
             w2 = ((v2[1] - v0[1]) * (x - v2[0]) + (v0[0] - v2[0]) * (y - v2[1])) / denom
             w3 = 1 - w1 - w2
             return w1, w2, w3
 
-        for i in range(0, len(triangleSet2D_input), 9):
-            v0 = triangleSet2D_input[i : i + 3]  # [x1, y1, z1]
-            v1 = triangleSet2D_input[i + 3 : i + 6]  # [x2, y2, z2]
-            v2 = triangleSet2D_input[i + 6 : i + 9]  # [x3, y3, z3]
+        # Agora iteramos sobre cada triângulo
+        for i in range(0, len(triangleSet3D_input), 12):
+            v0 = triangleSet3D_input[i:i+4]
+            v1 = triangleSet3D_input[i+4:i+8]
+            v2 = triangleSet3D_input[i+8:i+12]
 
-            # Encontrar a bounding box do triângulo
-            min_y = int(min(v0[1], v1[1], v2[1]))
-            max_y = int(max(v0[1], v1[1], v2[1]))
-            min_x = int(min(v0[0], v1[0], v2[0]))
-            max_x = int(max(v0[0], v1[0], v2[0]))
+            # Converter os vértices 3D para 2D dividindo por w
+            v0_proj = v0[:3] / v0[3]
+            v1_proj = v1[:3] / v1[3]
+            v2_proj = v2[:3] / v2[3]
 
+            # Aplicar a transformação de tela (screen_matrix)
+            v0_proj = screen_matrix @ np.append(v0_proj, 1)
+            v1_proj = screen_matrix @ np.append(v1_proj, 1)
+            v2_proj = screen_matrix @ np.append(v2_proj, 1)
+
+            # Coordenadas da bounding box (caixa delimitadora)
+            min_x = int(min(v0_proj[0], v1_proj[0], v2_proj[0]))
+            max_x = int(max(v0_proj[0], v1_proj[0], v2_proj[0]))
+            min_y = int(min(v0_proj[1], v1_proj[1], v2_proj[1]))
+            max_y = int(max(v0_proj[1], v1_proj[1], v2_proj[1]))
+
+            v0_r = colors.pop(0)
+            v0_g = colors.pop(0)
+            v0_b = colors.pop(0)
+            v1_r = colors.pop(0)
+            v1_g = colors.pop(0)
+            v1_b = colors.pop(0)
+            v2_r = colors.pop(0)
+            v2_g = colors.pop(0)
+            v2_b = colors.pop(0)
+
+            # Loop para rasterizar o triângulo dentro da bounding box
             for y in range(min_y, max_y + 1):
                 for x in range(min_x, max_x + 1):
-                    if perVertex:
-                        w1, w2, w3 = barycentric_coords(x, y, v0, v1, v2)
-                        if w1 >= 0 and w2 >= 0 and w3 >= 0:
-                            z_inv = w1 / v0[2] + w2 / v1[2] + w3 / v2[2]
-                            if z_inv != 0:
-                                z = 1 / z_inv
-                                color_r = w1 * colors[i] + w2 * colors[i + 3] + w3 * colors[i + 6]
-                                color_g = w1 * colors[i + 1] + w2 * colors[i + 4] + w3 * colors[i + 7]
-                                color_b = w1 * colors[i + 2] + w2 * colors[i + 5] + w3 * colors[i + 8]
-                                color = [color_r, color_g, color_b]
-                                gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, [int(c*255) for c in color])
-                    else:
-                        for y in range(min_y, max_y + 1):
-                            intersections = []
-                            for p0, p1 in [(v0, v1), (v1, v2), (v2, v0)]:
-                                if p0[1] == p1[1]:  # A linha é horizontal, sem interseção
-                                    continue
-                                if p0[1] > p1[1]:
-                                    p0, p1 = p1, p0
-                                if y < p0[1] or y > p1[1]:
-                                    continue
-                                t = (y - p0[1]) / (p1[1] - p0[1])
-                                x_intersect = p0[0] + t * (p1[0] - p0[0])
-                                intersections.append(x_intersect)
-                            if len(intersections) >= 2:
-                                intersections.sort()
-                                x_start = int(intersections[0])
-                                x_end = int(intersections[-1])
-                                for x in range(x_start, x_end + 1):
-                                    gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, [int(c * 255) for c in colors['emissiveColor']])
+                    # Calcular as coordenadas baricêntricas para o ponto (x, y)
+                    w1, w2, w3 = barycentric_coords(x, y, v0_proj, v1_proj, v2_proj)
+
+                    # Verificar se o ponto está dentro do triângulo
+                    if w1 >= 0 and w2 >= 0 and w3 >= 0:
+                        # Interpolação do Z no espaço 3D
+                        z_inv = (w1 / v0[2]) + (w2 / v1[2]) + (w3 / v2[2])
+                        z = 1 / z_inv
+
+                        # Interpolar as cores no espaço 3D
+                        if perVertex:
+                            color_r = (w1 * v0_r / v0[2] + w2 * v1_r / v1[2] + w3 * v2_r / v2[2]) * z
+                            color_g = (w1 * v0_g / v0[2] + w2 * v1_g / v1[2] + w3 * v2_g / v2[2]) * z
+                            color_b = (w1 * v0_b / v0[2] + w2 * v1_b / v1[2] + w3 * v2_b / v2[2]) * z
+                            color = [color_r, color_g, color_b]
+                        else:
+                            color = colors['emissiveColor']
+
+                        # Desenhar o pixel no framebuffer com a cor interpolada
+                        gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, [int(c * 255) for c in color])
 
 
     @staticmethod
@@ -620,6 +632,7 @@ class GL:
             triangles.extend(new_points[v1])
             triangles.extend(new_points[v2])
             triangles.extend(new_points[v3])
+            
 
             i += 1
 
@@ -711,7 +724,7 @@ class GL:
                 emissiveColor = colors['emissiveColor']
                 triangle_colors.extend(emissiveColor * 3)
 
-            i += 3  # Move to the next set of indices
+            i += 1  # Move to the next set of indices
 
         GL.triangleSet(triangles, triangle_colors)
         
