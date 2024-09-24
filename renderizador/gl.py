@@ -29,16 +29,46 @@ class GL:
     view_matrix = np.identity(4)
     transformation_matrix = np.identity(4)
     transform_stack = [np.identity(4)]
-    z_buffer = np.full((largura, altura), np.inf)
 
-   
+    z_buffer = np.full((largura, altura), np.inf)
+    framebuffer = np.zeros((largura, altura, 3), dtype=np.uint8)
+
+    current_texture = None
+    current_tex_coords = []
+
     @staticmethod
-    def draw_pixel(coord, depth, color):
+    def calculate_mipmap_level(v0, v1, v2):
+        # Calcular o tamanho do triângulo na tela
+        area = 0.5 * abs(v0[0] * (v1[1] - v2[1]) + v1[0] * (v2[1] - v0[1]) + v2[0] * (v0[1] - v1[1]))
+        # Calcular o nível de Mipmap com base na área do triângulo
+        level = int(np.log2(max(area, 1)))
+        return min(level, len(GL.current_texture) - 1)
+    
+    @staticmethod
+    def get_texture_color(texture, u, v, level):
+        # mipmaps = texture
+        # texture = mipmaps[level]
+        h, w, _ = texture.shape
+
+        # Converter coordenadas de textura para coordenadas de pixel
+        x = int(u * (w - 1))
+        y = int(v * (h - 1))
+
+        # Obter a cor da textura
+        color = texture[y, x] / 255.0
+        return color
+
+    @staticmethod
+    def draw_pixel(coord, depth, color, transp):
         x, y = coord
         if 0 <= x < GL.width and 0 <= y < GL.height:
             if depth < GL.z_buffer[x, y]:
                 GL.z_buffer[x, y] = depth
-                gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, color)
+                existing_color = GL.framebuffer[x, y] / 255.0
+                new_color = np.array(color) / 255.0
+                final_color = (1-transp) * new_color + (transp) * existing_color
+                GL.framebuffer[x, y] = (final_color * 255).astype(np.uint8)
+                gpu.GPU.draw_pixel([x, y], gpu.GPU.RGB8, GL.framebuffer[x, y])
 
 
     @staticmethod
@@ -48,6 +78,9 @@ class GL:
         GL.height = height
         GL.near = near
         GL.far = far
+
+        GL.largura = width
+        GL.altura = height
 
     @staticmethod
     def polypoint2D(point, colors):
@@ -268,11 +301,12 @@ class GL:
         )
 
         perVertex = False
-        if type(colors) == list:
+        if type(colors) == list and len(colors) != 0:
             perVertex = True
 
         # Lista para a chamada de triangleset2d
         triangleSet3D_input = []
+        tex_coords = GL.current_tex_coords
 
         while point:
             # Pontos do triângulo para interpolação
@@ -312,21 +346,29 @@ class GL:
             v1_proj = screen_matrix @ np.append(v1_proj, 1)
             v2_proj = screen_matrix @ np.append(v2_proj, 1)
 
+            #texture coords
+            if type(GL.current_texture) != None and len(GL.current_tex_coords) != 0:
+                t0 = tex_coords[(i//12)*6:(i//12)*6+2]
+                t1 = tex_coords[(i//12)*6+2:(i//12)*6+4]
+                t2 = tex_coords[(i//12)*6+4:(i//12)*6+6]
+
             # Coordenadas da bounding box (caixa delimitadora)
             min_x = int(min(v0_proj[0], v1_proj[0], v2_proj[0]))
             max_x = int(max(v0_proj[0], v1_proj[0], v2_proj[0]))
             min_y = int(min(v0_proj[1], v1_proj[1], v2_proj[1]))
             max_y = int(max(v0_proj[1], v1_proj[1], v2_proj[1]))
 
-            v0_r = colors.pop(0)
-            v0_g = colors.pop(0)
-            v0_b = colors.pop(0)
-            v1_r = colors.pop(0)
-            v1_g = colors.pop(0)
-            v1_b = colors.pop(0)
-            v2_r = colors.pop(0)
-            v2_g = colors.pop(0)
-            v2_b = colors.pop(0)
+            if perVertex:
+                v0_r = colors.pop(0)
+                v0_g = colors.pop(0)
+                v0_b = colors.pop(0)
+                v1_r = colors.pop(0)
+                v1_g = colors.pop(0)
+                v1_b = colors.pop(0)
+                v2_r = colors.pop(0)
+                v2_g = colors.pop(0)
+                v2_b = colors.pop(0)
+                transp = 0.0
 
             # Loop para rasterizar o triângulo dentro da bounding box
             for y in range(min_y, max_y + 1):
@@ -346,11 +388,20 @@ class GL:
                             color_g = (w1 * v0_g / v0[2] + w2 * v1_g / v1[2] + w3 * v2_g / v2[2]) * z
                             color_b = (w1 * v0_b / v0[2] + w2 * v1_b / v1[2] + w3 * v2_b / v2[2]) * z
                             color = [color_r, color_g, color_b]
+                        elif type(GL.current_texture) != None and len(GL.current_tex_coords) != 0:
+                            v = (w1 * t0[0] / v0[2] + w2 * t1[0] / v1[2] + w3 * t2[0] / v2[2]) * z
+                            u = -(w1 * t0[1] / v0[2] + w2 * t1[1] / v1[2] + w3 * t2[1] / v2[2]) * z
+                            # Calcular o nível de Mipmap apropriado
+                            level = GL.calculate_mipmap_level(v0, v1, v2)
+                            r, g, b, _ = GL.get_texture_color(GL.current_texture, u, v, level)
+                            color = [r, g, b]
+                            transp = 0.0
                         else:
+                            transp = colors['transparency']
                             color = colors['emissiveColor']
 
                         # Desenhar o pixel no framebuffer com a cor interpolada
-                        GL.draw_pixel([x, y], z, [int(c * 255) for c in color])
+                        GL.draw_pixel([x, y], z, [int(c * 255) for c in color], transp)
 
 
     @staticmethod
@@ -416,9 +467,9 @@ class GL:
         matriz_look_at = matriz_rotacao @ matriz_translacao
 
         # Matriz de projeção perspectiva
-        razao_aspecto = GL.largura / GL.altura
-        proximo = GL.proximo
-        distante = GL.distante
+        razao_aspecto = GL.width / GL.height
+        proximo = GL.near
+        distante = GL.far
         topo = proximo * np.tan(fieldOfView / 2)
         direita = topo * razao_aspecto
 
@@ -701,11 +752,17 @@ class GL:
         triangles = []
         triangle_colors = []
         new_points = []
+
+        if current_texture:
+            GL.current_texture = gpu.GPU.load_texture(current_texture[0])
+
         for i in range(0, len(coord), 3):
             point_n = [coord[i], coord[i+1], coord[i+2]]
             new_points.append(point_n)        
 
         i = 0
+
+        print(texCoord)
 
         while i < len(coordIndex) - 2:
             if coordIndex[i] == -1:
@@ -731,6 +788,16 @@ class GL:
                 triangle_colors.extend(c1)
                 triangle_colors.extend(c2)
                 triangle_colors.extend(c3)
+            elif texCoord and texCoordIndex:
+                t1 = texCoordIndex[i]
+                t2 = texCoordIndex[i+1]
+                t3 = texCoordIndex[i+2]
+                GL.current_tex_coords.extend([texCoord[t1*2]])
+                GL.current_tex_coords.extend([texCoord[t1*2+1]])
+                GL.current_tex_coords.extend([texCoord[t2*2]])
+                GL.current_tex_coords.extend([texCoord[t2*2+1]])
+                GL.current_tex_coords.extend([texCoord[t3*2]])
+                GL.current_tex_coords.extend([texCoord[t3*2+1]])
             else:
                 emissiveColor = colors['emissiveColor']
                 triangle_colors.extend(emissiveColor * 3)
