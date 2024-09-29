@@ -37,12 +37,31 @@ class GL:
     current_tex_coords = []
 
     @staticmethod
-    def calculate_mipmap_level(v0, v1, v2):
-        # Calcular o tamanho do triângulo na tela
-        area = 0.5 * abs(v0[0] * (v1[1] - v2[1]) + v1[0] * (v2[1] - v0[1]) + v2[0] * (v0[1] - v1[1]))
-        # Calcular o nível de Mipmap com base na área do triângulo
-        level = int(np.log2(max(area, 1)))
-        return min(level, len(GL.current_texture) - 1)
+    def calculate_mipmap_level(v0, v1, v2, t0, t1, t2, texture):
+    # Calcular as distâncias entre os vértices no espaço da tela
+        edge1 = np.array([v1[0] - v0[0], v1[1] - v0[1]])
+        edge2 = np.array([v2[0] - v0[0], v2[1] - v0[1]])
+
+        # Calcular as distâncias entre os vértices nas coordenadas de textura
+        tex_edge1 = np.array([t1[0] - t0[0], t1[1] - t0[1]])
+        tex_edge2 = np.array([t2[0] - t0[0], t2[1] - t0[1]])
+
+        # Calcular a área do triângulo no espaço da tela
+        screen_area = 0.5 * np.abs(edge1[0] * edge2[1] - edge1[1] * edge2[0])
+
+        # Calcular a área do triângulo nas coordenadas de textura
+        tex_area = 0.5 * np.abs(tex_edge1[0] * tex_edge2[1] - tex_edge1[1] * tex_edge2[0])
+
+        # Calcular o nível de Mipmap com base na razão entre as áreas
+        if tex_area > 0:
+            ratio = screen_area / tex_area
+            level = int(np.log2(ratio))
+        else:
+            level = 0
+
+        # Garantir que o nível de Mipmap esteja dentro dos limites
+        return max(0, min(level, len(texture) - 1))
+
     
     @staticmethod
     def get_texture_color(texture, u, v, level):
@@ -50,11 +69,15 @@ class GL:
         # texture = mipmaps[level]
         h, w, _ = texture.shape
 
-        # Converter coordenadas de textura para coordenadas de pixel
+        # Coordenadas de textura (UV) devem estar no intervalo [0, 1]
+        u = u % 1.0
+        v = v % 1.0
+
+        # Converter coordenadas de textura para coordenadas de pixel no nível de Mipmap
         x = int(u * (w - 1))
         y = int(v * (h - 1))
 
-        # Obter a cor da textura
+        # Obter a cor da textura no nível de Mipmap
         color = texture[y, x] / 255.0
         return color
 
@@ -392,7 +415,7 @@ class GL:
                             v = (w1 * t0[0] / v0[2] + w2 * t1[0] / v1[2] + w3 * t2[0] / v2[2]) * z
                             u = -(w1 * t0[1] / v0[2] + w2 * t1[1] / v1[2] + w3 * t2[1] / v2[2]) * z
                             # Calcular o nível de Mipmap apropriado
-                            level = GL.calculate_mipmap_level(v0, v1, v2)
+                            level = GL.calculate_mipmap_level(v0, v1, v2, t0, t1, t2, GL.current_texture)
                             r, g, b, _ = GL.get_texture_color(GL.current_texture, u, v, level)
                             color = [r, g, b]
                             transp = 0.0
